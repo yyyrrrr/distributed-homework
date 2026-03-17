@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.stock_seckill_system.mapper.UserMapper">
+    <select id="findByUsername" parameterType="string" resultType="com.example.stock_seckill_system.model.User">
+        select id, username, password, email, create_time as createTime, update_time as updateTime
+        from user
+        where username = #{username}
+    </select>
+    <insert id="insert" parameterType="com.example.stock_seckill_system.model.User">
+        insert into user (username, password, email, create_time, update_time)
+        values (#{username}, #{password}, #{email}, now(), now())
+    </insert>
+</mapper>

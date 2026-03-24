@@ -1,120 +1,87 @@
 package com.example.stock_seckill_system.service.impl;
 
+import com.example.stock_seckill_system.config.datasource.ReadOnly;
 import com.example.stock_seckill_system.mapper.ProductMapper;
 import com.example.stock_seckill_system.model.Product;
 import com.example.stock_seckill_system.service.ProductService;
+import com.example.stock_seckill_system.util.CacheUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
-
-import java.util.concurrent.TimeUnit;
 
 @Service
 public class ProductServiceImpl implements ProductService {
 
+    private static final Logger logger = LoggerFactory.getLogger(ProductServiceImpl.class);
+
     @Autowired
     private ProductMapper productMapper;
 
-    @Autowired(required = false)
-    private RedisTemplate<String, Object> redisTemplate;
+    @Autowired
+    private CacheUtil cacheUtil;
 
-    private static final String PRODUCT_KEY_PREFIX = "product:";
-    private static final String PRODUCT_LOCK_PREFIX = "product:lock:";
-    private static final long CACHE_EXPIRE_TIME = 30L;
-    private static final long LOCK_EXPIRE_TIME = 10L;
-
-    private boolean isRedisAvailable() {
-        try {
-            if (redisTemplate != null) {
-                redisTemplate.opsForValue().get("test");
-                return true;
-            }
-            return false;
-        } catch (Exception e) {
-            return false;
-        }
-    }
+    private static final String PRODUCT_CACHE_PREFIX = "product:";
 
     @Override
+    @ReadOnly
     public Product getProductById(Long id) {
-        if (!isRedisAvailable()) {
+        if (id == null || id <= 0) {
+            logger.warn("无效的商品ID: {}", id);
+            return null;
+        }
+
+        String cacheKey = PRODUCT_CACHE_PREFIX + id;
+        logger.info("获取商品信息: id={}", id);
+
+        // 使用缓存工具类获取数据，自动处理穿透、击穿、雪崩问题
+        return cacheUtil.getWithLoad(cacheKey, key -> {
+            logger.debug("从数据库加载商品: id={}", id);
             return productMapper.findById(id);
-        }
-
-        String key = PRODUCT_KEY_PREFIX + id;
-        Product product = (Product) redisTemplate.opsForValue().get(key);
-
-        if (product != null) {
-            return product;
-        }
-
-        String lockKey = PRODUCT_LOCK_PREFIX + id;
-        Boolean locked = redisTemplate.opsForValue().setIfAbsent(lockKey, "1", LOCK_EXPIRE_TIME, TimeUnit.SECONDS);
-
-        if (locked != null && locked) {
-            try {
-                product = productMapper.findById(id);
-
-                if (product == null) {
-                    redisTemplate.opsForValue().set(key, "", 5L, TimeUnit.MINUTES);
-                    return null;
-                }
-
-                long expireTime = CACHE_EXPIRE_TIME + (long) (Math.random() * 60);
-                redisTemplate.opsForValue().set(key, product, expireTime, TimeUnit.MINUTES);
-            } finally {
-                redisTemplate.delete(lockKey);
-            }
-        } else {
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-            return getProductById(id);
-        }
-
-        return product;
+        });
     }
 
     @Override
     public boolean deductStock(Long id, Integer quantity) {
-        Product product = getProductById(id);
-        if (product == null || product.getStock() < quantity) {
+        logger.info("扣减库存: id={}, quantity={}", id, quantity);
+        
+        if (id == null || id <= 0 || quantity == null || quantity <= 0) {
+            logger.warn("无效的扣减参数: id={}, quantity={}", id, quantity);
             return false;
         }
 
-        int result = productMapper.updateStock(id, product.getStock() - quantity);
+        // 写操作使用主库
+        int result = productMapper.updateStock(id, -quantity);
+        
         if (result > 0) {
-            if (isRedisAvailable()) {
-                String key = PRODUCT_KEY_PREFIX + id;
-                product.setStock(product.getStock() - quantity);
-                redisTemplate.opsForValue().set(key, product, CACHE_EXPIRE_TIME, TimeUnit.MINUTES);
-            }
-            return true;
+            // 库存扣减成功，清除缓存
+            String cacheKey = PRODUCT_CACHE_PREFIX + id;
+            cacheUtil.delete(cacheKey);
+            logger.info("库存扣减成功，清除缓存: id={}", id);
         }
-
-        return false;
+        
+        return result > 0;
     }
 
     @Override
     public boolean deductSeckillStock(Long id) {
-        Product product = getProductById(id);
-        if (product == null || product.getSeckillStock() <= 0) {
+        logger.info("扣减秒杀库存: id={}", id);
+        
+        if (id == null || id <= 0) {
+            logger.warn("无效的商品ID: {}", id);
             return false;
         }
 
-        int result = productMapper.updateSeckillStock(id, product.getSeckillStock() - 1);
+        // 写操作使用主库
+        int result = productMapper.updateSeckillStock(id, -1);
+        
         if (result > 0) {
-            if (isRedisAvailable()) {
-                String key = PRODUCT_KEY_PREFIX + id;
-                product.setSeckillStock(product.getSeckillStock() - 1);
-                redisTemplate.opsForValue().set(key, product, CACHE_EXPIRE_TIME, TimeUnit.MINUTES);
-            }
-            return true;
+            // 秒杀库存扣减成功，清除缓存
+            String cacheKey = PRODUCT_CACHE_PREFIX + id;
+            cacheUtil.delete(cacheKey);
+            logger.info("秒杀库存扣减成功，清除缓存: id={}", id);
         }
-
-        return false;
+        
+        return result > 0;
     }
 }

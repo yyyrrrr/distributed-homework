@@ -50,14 +50,6 @@ function displayProductDetail(product) {
     productImage.src = `/images/product${product.id}.jpg`;
     productImage.alt = product.name;
     
-    // 如果有秒杀信息，显示秒杀区域
-    if (product.seckillPrice > 0 && product.seckillStock > 0) {
-        const seckillInfo = document.getElementById('seckillInfo');
-        seckillInfo.style.display = 'block';
-        document.getElementById('seckillPrice').textContent = product.seckillPrice.toFixed(2);
-        document.getElementById('seckillStock').textContent = product.seckillStock;
-    }
-    
     // 显示商品详情区域
     document.getElementById('productDetail').style.display = 'block';
 }
@@ -87,15 +79,19 @@ function handleSeckill(productId) {
         return;
     }
     
-    fetch(`/api/product/seckill/${productId}`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('秒杀失败');
-            }
-            return response.text();
-        })
+    // 模拟用户ID，实际应用中应该从登录状态获取
+    const userId = 1;
+    
+    fetch('/seckill/do', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: `userId=${userId}&productId=${productId}`
+    })
+        .then(response => response.text())
         .then(result => {
-            alert('秒杀成功！');
+            alert(result);
             // 重新加载商品详情以更新库存
             loadProductDetail(productId);
         })

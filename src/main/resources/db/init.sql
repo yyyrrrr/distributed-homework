@@ -33,16 +33,16 @@ INSERT INTO product (name, description, price, stock, seckill_stock, seckill_pri
 ('商品2', '这是商品2的描述', 199.99, 200, 100, 149.99, 1, NOW(), NOW()),
 ('商品3', '这是商品3的描述', 299.99, 150, 80, 249.99, 1, NOW(), NOW());
 
--- 创建订单表（预留）
-CREATE TABLE IF NOT EXISTS orders (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+-- 创建订单表
+CREATE TABLE IF NOT EXISTS `order` (
+    id BIGINT PRIMARY KEY,
     user_id BIGINT NOT NULL,
     product_id BIGINT NOT NULL,
-    quantity INT NOT NULL,
-    total_price DECIMAL(10,2) NOT NULL,
-    status VARCHAR(20) NOT NULL,
+    price DECIMAL(10,2) NOT NULL,
+    status INT NOT NULL,
     create_time DATETIME NOT NULL,
-    update_time DATETIME NOT NULL,
+    pay_time DATETIME,
     FOREIGN KEY (user_id) REFERENCES user(id),
-    FOREIGN KEY (product_id) REFERENCES product(id)
+    FOREIGN KEY (product_id) REFERENCES product(id),
+    UNIQUE KEY uk_user_product (user_id, product_id)
 );

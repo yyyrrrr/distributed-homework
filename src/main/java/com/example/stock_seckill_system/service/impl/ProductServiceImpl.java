@@ -51,7 +51,7 @@ public class ProductServiceImpl implements ProductService {
         }
 
         // 写操作使用主库
-        int result = productMapper.updateStock(id, -quantity);
+        int result = productMapper.updateStockByQuantity(id, -quantity);
         
         if (result > 0) {
             // 库存扣减成功，清除缓存

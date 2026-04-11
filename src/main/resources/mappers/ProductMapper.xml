@@ -5,11 +5,19 @@
         SELECT * FROM product WHERE id = #{id}
     </select>
     
-    <update id="updateStock" parameterType="map">
-        UPDATE product SET stock = #{stock} WHERE id = #{id}
+    <update id="updateStock" parameterType="java.lang.Long">
+        UPDATE product SET stock = stock - 1 WHERE id = #{id} AND stock > 0
+    </update>
+    
+    <update id="updateStockByQuantity" parameterType="map">
+        UPDATE product SET stock = stock + #{stock} WHERE id = #{id} AND stock > -#{stock}
     </update>
     
     <update id="updateSeckillStock" parameterType="map">
-        UPDATE product SET seckill_stock = #{seckillStock} WHERE id = #{id}
+        UPDATE product SET seckill_stock = seckill_stock + #{seckillStock} WHERE id = #{id} AND seckill_stock > -#{seckillStock}
     </update>
+    
+    <select id="selectAll" resultType="com.example.stock_seckill_system.model.Product">
+        SELECT * FROM product
+    </select>
 </mapper>

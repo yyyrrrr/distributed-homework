@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.stock_seckill_system.mapper.OrderMapper">
+    <insert id="insert" parameterType="com.example.stock_seckill_system.model.Order">
+        INSERT INTO orders (id, user_id, product_id, quantity, total_price, status, create_time, update_time)
+        VALUES (#{id}, #{userId}, #{productId}, #{quantity}, #{totalPrice}, #{status}, #{createTime}, #{updateTime})
+    </insert>
+    <select id="selectById" parameterType="java.lang.Long" resultType="com.example.stock_seckill_system.model.Order">
+        SELECT id, user_id, product_id, quantity, total_price, status, create_time, update_time
+        FROM orders
+        WHERE id = #{id}
+    </select>
+    <select id="selectByUserIdAndProductId" resultType="com.example.stock_seckill_system.model.Order">
+        SELECT id, user_id, product_id, quantity, total_price, status, create_time, update_time
+        FROM orders
+        WHERE user_id = #{userId} AND product_id = #{productId}
+    </select>
+</mapper>

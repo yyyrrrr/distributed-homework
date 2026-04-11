@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>秒杀测试 - 商品库存与秒杀系统</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .test-section {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .test-section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #3498db;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #555;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        
+        .btn {
+            padding: 12px 30px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-right: 10px;
+        }
+        
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #2980b9;
+        }
+        
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+        
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        
+        .result.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .result.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .test-case {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+        
+        .test-case h3 {
+            margin-top: 0;
+            color: #495057;
+        }
+        
+        .test-case button {
+            margin-top: 10px;
+        }
+        
+        .test-results {
+            margin-top: 30px;
+        }
+        
+        .test-results h3 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>商品库存与秒杀系统</h1>
+            <nav>
+                <ul>
+                    <li><a href="/pages/index.html">首页</a></li>
+                    <li><a href="/pages/index.html">商品列表</a></li>
+                    <li><a href="/pages/seckill-test.html">秒杀测试</a></li>
+                    <li><a href="#">个人中心</a></li>
+                </ul>
+            </nav>
+        </header>
+        
+        <main class="test-container">
+            <section class="test-section">
+                <h2>秒杀功能测试</h2>
+                
+                <div class="form-group">
+                    <label for="userId">用户ID</label>
+                    <input type="number" id="userId" placeholder="输入用户ID" value="1">
+                </div>
+                
+                <div class="form-group">
+                    <label for="productId">商品ID</label>
+                    <input type="number" id="productId" placeholder="输入商品ID" value="1">
+                </div>
+                
+                <button class="btn btn-danger" onclick="testSeckill()">执行秒杀测试</button>
+                <button class="btn btn-primary" onclick="clearResult()">清空结果</button>
+                
+                <div id="result" class="result" style="display: none;"></div>
+            </section>
+            
+            <section class="test-section">
+                <h2>测试用例</h2>
+                
+                <div class="test-case">
+                    <h3>测试用例 1: 正常秒杀</h3>
+                    <p>测试用户1秒杀商品1</p>
+                    <button class="btn btn-primary" onclick="runTestCase(1, 1)">执行测试</button>
+                </div>
+                
+                <div class="test-case">
+                    <h3>测试用例 2: 重复秒杀</h3>
+                    <p>测试用户1重复秒杀商品1</p>
+                    <button class="btn btn-primary" onclick="runTestCase(1, 1)">执行测试</button>
+                </div>
+                
+                <div class="test-case">
+                    <h3>测试用例 3: 库存不足</h3>
+                    <p>测试库存为0时的秒杀</p>
+                    <button class="btn btn-primary" onclick="testInsufficientStock()">执行测试</button>
+                </div>
+            </section>
+        </main>
+        
+        <footer>
+            <p>&copy; 2026 商品库存与秒杀系统</p>
+        </footer>
+    </div>
+    
+    <script>
+        // 执行秒杀测试
+        function testSeckill() {
+            const userId = document.getElementById('userId').value;
+            const productId = document.getElementById('productId').value;
+            
+            if (!userId || !productId) {
+                showResult('请输入用户ID和商品ID', 'error');
+                return;
+            }
+            
+            showResult('执行秒杀中...', 'success');
+            
+            fetch('/seckill/do', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: `userId=${userId}&productId=${productId}`
+            })
+                .then(response => response.text())
+                .then(result => {
+                    showResult(`秒杀结果: ${result}`, 'success');
+                })
+                .catch(error => {
+                    showResult(`秒杀失败: ${error.message}`, 'error');
+                });
+        }
+        
+        // 执行测试用例
+        function runTestCase(userId, productId) {
+            document.getElementById('userId').value = userId;
+            document.getElementById('productId').value = productId;
+            testSeckill();
+        }
+        
+        // 测试库存不足
+        function testInsufficientStock() {
+            // 首先将库存设置为0
+            fetch(`/api/product/update-stock?productId=1&stock=0`)
+                .then(response => response.text())
+                .then(() => {
+                    // 然后执行秒杀
+                    runTestCase(2, 1);
+                })
+                .catch(error => {
+                    showResult(`设置库存失败: ${error.message}`, 'error');
+                });
+        }
+        
+        // 显示结果
+        function showResult(message, type) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = message;
+            resultDiv.className = `result ${type}`;
+            resultDiv.style.display = 'block';
+        }
+        
+        // 清空结果
+        function clearResult() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.style.display = 'none';
+        }
+    </script>
+</body>
+</html>

@@ -6,4 +6,6 @@ public interface OrderService {
     Order createOrder(Long userId, Long productId);
     Order getOrderById(Long id);
     Order getOrderByUserIdAndProductId(Long userId, Long productId);
+    boolean payOrder(Long orderId);
+    boolean updateOrderStatus(Long orderId, String status);
 }

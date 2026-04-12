@@ -7,7 +7,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
+
+import java.util.Arrays;
+import java.util.Collections;
 
 @Service
 public class SeckillService {
@@ -20,32 +24,54 @@ public class SeckillService {
     @Autowired
     private OrderService orderService;
 
+    // Redis脚本：检查库存并扣减，同时标记用户已秒杀
+    private final DefaultRedisScript<Long> seckillScript = new DefaultRedisScript<>();
+
+    public SeckillService() {
+        // 初始化Redis脚本
+        seckillScript.setScriptText(
+            "local stockKey = KEYS[1]\n" +
+            "local userProductKey = KEYS[2]\n" +
+            "\n" +
+            "-- 检查用户是否已经秒杀过\n" +
+            "if redis.call('exists', userProductKey) == 1 then\n" +
+            "    return -1\n" +
+            "end\n" +
+            "\n" +
+            "-- 检查库存\n" +
+            "local stock = tonumber(redis.call('get', stockKey))\n" +
+            "if not stock or stock <= 0 then\n" +
+            "    return 0\n" +
+            "end\n" +
+            "\n" +
+            "-- 扣减库存\n" +
+            "redis.call('decr', stockKey)\n" +
+            "\n" +
+            "-- 标记用户已秒杀\n" +
+            "redis.call('set', userProductKey, '1')\n" +
+            "\n" +
+            "return 1"
+        );
+        seckillScript.setResultType(Long.class);
+    }
+
     public void seckill(Long userId, Long productId) throws Exception {
-        // 1. 检查是否已经秒杀过（幂等性）
-        String userProductKey = "seckill:user:" + userId + ":product:" + productId;
-        if (Boolean.TRUE.equals(redisTemplate.hasKey(userProductKey))) {
-            throw new RuntimeException("您已经秒杀过该商品");
-        }
-
-        // 2. 检查库存
         String stockKey = "seckill:stock:" + productId;
-        Integer stock = (Integer) redisTemplate.opsForValue().get(stockKey);
-        if (stock == null || stock <= 0) {
+        String userProductKey = "seckill:user:" + userId + ":product:" + productId;
+
+        // 使用Redis脚本执行原子操作
+        Long result = redisTemplate.execute(
+            seckillScript,
+            Arrays.asList(stockKey, userProductKey)
+        );
+
+        if (result == -1) {
+            throw new RuntimeException("您已经秒杀过该商品");
+        } else if (result == 0) {
             throw new RuntimeException("商品库存不足");
         }
 
-        // 3. 扣减库存
-        Long decrement = redisTemplate.opsForValue().decrement(stockKey);
-        if (decrement < 0) {
-            // 库存不足，回滚
-            redisTemplate.opsForValue().increment(stockKey);
-            throw new RuntimeException("商品库存不足");
-        }
-
-        // 4. 标记用户已秒杀
-        redisTemplate.opsForValue().set(userProductKey, "1");
-
-        // 5. 发送秒杀消息到队列
+        // 发送秒杀消息到队列
         try {
             SeckillMessage message = new SeckillMessage();
             message.setUserId(userId);

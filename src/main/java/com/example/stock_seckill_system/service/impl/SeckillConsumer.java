@@ -6,6 +6,7 @@ import com.example.stock_seckill_system.service.OrderService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -14,14 +15,25 @@ public class SeckillConsumer {
     private OrderService orderService;
     @Autowired
     private ObjectMapper objectMapper;
+    @Autowired
+    private RedisTemplate<String, Object> redisTemplate;
 
     @RabbitListener(queues = RabbitMQConfig.SEckill_QUEUE)
     public void handleSeckillMessage(String message) {
+        SeckillMessage seckillMessage = null;
         try {
-            SeckillMessage seckillMessage = objectMapper.readValue(message, SeckillMessage.class);
+            seckillMessage = objectMapper.readValue(message, SeckillMessage.class);
             orderService.createOrder(seckillMessage.getUserId(), seckillMessage.getProductId());
         } catch (Exception e) {
             e.printStackTrace();
+            // 处理异常，回滚Redis中的预扣减
+            if (seckillMessage != null) {
+                String stockKey = "seckill:stock:" + seckillMessage.getProductId();
+                redisTemplate.opsForValue().increment(stockKey);
+                // 清除用户秒杀标记
+                String userProductKey = "seckill:user:" + seckillMessage.getUserId() + ":product:" + seckillMessage.getProductId();
+                redisTemplate.delete(userProductKey);
+            }
         }
     }
 }

@@ -37,12 +37,24 @@ public class OrderServiceImpl implements OrderService {
         // 2. 检查库存
         Product product = productMapper.findById(productId);
         if (product == null || product.getStock() <= 0) {
+            // 库存不足，回滚Redis中的预扣减
+            String stockKey = "seckill:stock:" + productId;
+            redisTemplate.opsForValue().increment(stockKey);
+            // 清除用户秒杀标记
+            String userProductKey = "seckill:user:" + userId + ":product:" + productId;
+            redisTemplate.delete(userProductKey);
             throw new RuntimeException("商品不存在或库存不足");
         }
 
         // 3. 扣减库存
         int result = productMapper.updateStock(productId);
         if (result == 0) {
+            // 库存扣减失败，回滚Redis中的预扣减
+            String stockKey = "seckill:stock:" + productId;
+            redisTemplate.opsForValue().increment(stockKey);
+            // 清除用户秒杀标记
+            String userProductKey = "seckill:user:" + userId + ":product:" + productId;
+            redisTemplate.delete(userProductKey);
             throw new RuntimeException("库存扣减失败");
         }
 
@@ -69,5 +81,30 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public Order getOrderByUserIdAndProductId(Long userId, Long productId) {
         return orderMapper.selectByUserIdAndProductId(userId, productId);
+    }
+
+    @Override
+    @Transactional
+    public boolean payOrder(Long orderId) {
+        // 1. 检查订单是否存在
+        Order order = orderMapper.selectById(orderId);
+        if (order == null) {
+            return false;
+        }
+
+        // 2. 检查订单状态是否为PENDING
+        if (!"PENDING".equals(order.getStatus())) {
+            return false;
+        }
+
+        // 3. 更新订单状态为PAID
+        return updateOrderStatus(orderId, "PAID");
+    }
+
+    @Override
+    @Transactional
+    public boolean updateOrderStatus(Long orderId, String status) {
+        int result = orderMapper.updateStatus(orderId, status);
+        return result > 0;
     }
 }

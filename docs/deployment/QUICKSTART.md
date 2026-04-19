@@ -236,3 +236,89 @@ public class OrderService {
 ---
 
 **提示**：本实现使用 ThreadLocal 存储数据源上下文，确保线程隔离和安全性。
+
+## Nacos 注册发现与 Gateway 快速验证
+
+### 1. 启动 Nacos
+
+```bash
+docker compose -f deploy/docker/docker-compose-nacos.yml up -d
+```
+
+启动后访问 Nacos 控制台：`http://localhost:8848/nacos`
+
+### 2. 启动业务服务与网关
+
+```bash
+# 启动业务服务（注册到 Nacos）
+mvn spring-boot:run
+
+# 新终端启动 Gateway
+mvn -f gateway/pom.xml spring-boot:run
+```
+
+默认端口：
+- 业务服务：`http://localhost:8080`
+- Gateway：`http://localhost:8088`
+
+### 3. 在 Nacos 发布服务动态配置
+
+发布 `stock-seckill-system.properties`：
+
+```bash
+curl -X POST "http://localhost:8848/nacos/v1/cs/configs" \
+    -d "dataId=stock-seckill-system.properties" \
+    -d "group=DEFAULT_GROUP" \
+    -d "content=seckill.dynamic.message=hello-from-nacos\nseckill.dynamic.threshold=200"
+```
+
+读取配置接口验证：
+
+```bash
+curl http://localhost:8080/api/config/dynamic
+```
+
+### 4. 使用网关地址验证动态服务路由
+
+通过 Gateway 路由到业务服务：
+
+```bash
+curl http://localhost:8088/seckill/api/product/detail/1
+```
+
+也可验证基于服务名的发现路由（discovery locator）：
+
+```bash
+curl http://localhost:8088/stock-seckill-system/api/product/detail/1
+```
+
+### 5. 验证 Nacos 配置热更新
+
+修改 Nacos 配置后再次读取接口，检查返回值是否变化：
+
+```bash
+curl -X POST "http://localhost:8848/nacos/v1/cs/configs" \
+    -d "dataId=stock-seckill-system.properties" \
+    -d "group=DEFAULT_GROUP" \
+    -d "content=seckill.dynamic.message=message-updated\nseckill.dynamic.threshold=520"
+
+curl http://localhost:8080/api/config/dynamic
+```
+
+如果返回值中的 `message` 和 `threshold` 更新，说明动态配置生效。
+
+## 流量治理与压测
+
+新增流量治理测试接口：
+
+- `GET /api/traffic/governance?fail=false&sleepMs=20`
+
+返回：
+
+- `status=ok`：正常处理
+- `status=degraded`：触发限流/熔断后降级返回
+
+JMeter 压测资源：
+
+- 脚本：`docs/jmeter/traffic-governance-test.jmx`
+- 说明：`docs/jmeter/README.md`

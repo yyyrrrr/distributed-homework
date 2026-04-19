@@ -7,7 +7,8 @@
 ## 技术栈
 
 - **编程语言**：Java 17
-- **框架**：Spring Boot 4.0.3
+- **框架**：Spring Boot 3.2.5
+- **微服务组件**：Spring Cloud Gateway、Nacos（注册中心 + 配置中心）
 - **持久层**：MyBatis 4.0.1
 - **数据库**：MySQL 8.0+
 - **安全**：Spring Security
@@ -33,6 +34,9 @@ distributed-homework/
 │   │       ├── mappers/          # MyBatis XML映射
 │   │       └── application.properties  # 配置文件
 │   └── test/                     # 测试代码
+├── gateway/                      # Spring Cloud Gateway 子工程
+│   ├── src/main/java             # 网关启动类
+│   └── src/main/resources        # 网关路由与Nacos配置
 ├── pom.xml                       # Maven依赖
 ├── 系统设计文档.md                 # 系统设计文档
 └── README.md                     # 项目说明
